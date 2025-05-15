@@ -4,7 +4,8 @@
 #include <sys/stat.h>
 #include "img_editing.h"
 
-/* Bibliotecas para processamento de imagem */
+// Bibliotecas
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "libs/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -22,18 +23,16 @@ int create_output_directory(const char *input_dir, const char *edit_type, char *
 
 /*
  * Função principal de transformação de imagem
- * 1. Carrega a imagem do disco
- * 2. Aplica a transformação pixel a pixel
- * 3. Salva a imagem transformada
  */
 int transform_image(const char *input_path, const char *output_path, PixelTransformFunction transform)
 {
     int width, height, channels;
+    // Carrega a imagem do disco
     unsigned char *img = stbi_load(input_path, &width, &height, &channels, 3);
     if (!img)
         return 0;
 
-    /* Aplica a transformação em cada pixel da imagem */
+    // Aplica a transformação pixel a pixel
     for (int i = 0; i < width * height; i++)
     {
         Pixel input_pixel = {img[i * 3], img[i * 3 + 1], img[i * 3 + 2]};
@@ -43,6 +42,7 @@ int transform_image(const char *input_path, const char *output_path, PixelTransf
         img[i * 3 + 2] = output_pixel.b;
     }
 
+    // Salva a imagem transformada
     int success = stbi_write_jpg(output_path, width, height, 3, img, 100);
     stbi_image_free(img);
     return success;

@@ -9,6 +9,10 @@
 #include <time.h>
 #include "img_editing.h"
 
+// ----------------
+// Funções E/S
+// ----------------
+
 void clear_input_buffer()
 {
     int c;
@@ -146,27 +150,30 @@ ImagePath *scan_directory(const char *input_dir, const char *output_dir, int *co
     return paths;
 }
 
+
+
+
+// ----------------
+// Lógica principal
+// ----------------
+
 /**
- * Obtém a próxima imagem da fila para processamento
- *
+ * @brief Obtém a próxima imagem da fila para processamento
+ * 
  * SINCRONIZAÇÃO:
  * - Usa mutex para proteger acesso à fila compartilhada
  * - Implementa espera em condição quando fila está vazia
  * - Lida com sinais de terminação do programa
  *
  * @param state Estado compartilhado contendo a fila de imagens
- * @return Próxima imagem a ser processada ou NULL se deve terminar
+ * @return Próxima imagem a ser processada ou NULL, se deve terminar
  */
 ImagePath *get_next_image(SharedState *state)
 {
-    /*
-     * MUTEX LOCK: Protege o acesso à fila compartilhada
-     * Nenhuma outra thread pode modificar a fila durante esta operação
-     */
     pthread_mutex_lock(&state->queue.mutex);
 
     /*
-     * ESPERA CONDICIONAL: Suspende thread quando não há trabalho
+     * SUSPENSÃO CONTROLADA: Suspende thread quando não há trabalho
      *
      * 1. Verifica se fila está vazia (current >= size) ou se programa está terminando
      * 2. Enquanto não houver trabalho E programa não estiver terminando:
@@ -187,31 +194,25 @@ ImagePath *get_next_image(SharedState *state)
         pthread_cond_wait(&state->queue.queue_cond, &state->queue.mutex);
     }
 
-    /* Se programa está terminando, retorna NULL para iniciar término da thread */
     if (state->queue.should_exit)
     {
         pthread_mutex_unlock(&state->queue.mutex);
         return NULL;
     }
 
-    /*
-     * Obtém próxima imagem e incrementa contador atomicamente
-     * Como estamos com mutex bloqueado, esta operação é thread-safe
-     */
     ImagePath *path = &state->queue.paths[state->queue.current++];
 
-    /* MUTEX UNLOCK: Libera mutex para outras threads acessarem a fila */
     pthread_mutex_unlock(&state->queue.mutex);
 
     return path;
 }
 
 /**
- * Thread trabalhadora do pool de threads - processa imagens da fila
+ * @brief Thread trabalhadora do pool de threads
  *
  * SINCRONIZAÇÃO:
- * - Obtém imagens da fila thread-safe (via get_next_image)
- * - Incrementa contador de imagens processadas de forma atômica
+ * - Obtém imagens da fila thread-safe
+ * - Incrementa contador de imagens processadas
  * - Sinaliza término do processamento quando última imagem é processada
  *
  * @param arg Ponteiro para o estado compartilhado (SharedState)
@@ -223,26 +224,18 @@ void *worker_thread(void *arg)
 
     while (1)
     {
-        /*
-         * Obtém próxima imagem da fila - operação thread-safe
-         * Internamente get_next_image lida com mutex e condições de sincronização
-         */
         ImagePath *path = get_next_image(state);
         if (!path) // Retorna NULL quando fila vazia e should_exit=true
             break;
 
-        /* Processa imagem - esta é a operação principal de cada thread */
+        // Processa imagem
         if (transform_image(path->input_path, path->output_path, state->transform))
         {
-            /*
-             * MUTEX LOCK: Protege operação de incremento do contador
-             * Precisamos de exclusão mútua para incrementar o contador de forma segura
-             */
             pthread_mutex_lock(&state->queue.mutex);
             state->queue.processed++;
 
             /*
-             * SINALIZAÇÃO DE CONDIÇÃO: Notifica que processamento terminou
+             * SUSPENSÃO CONTROLADA: Notifica que processamento terminou
              *
              * Se esta foi a última imagem a ser processada (processed == size):
              * - Sinaliza a thread principal através da variável de condição done_cond
@@ -256,83 +249,65 @@ void *worker_thread(void *arg)
                 pthread_cond_signal(&state->queue.done_cond);
             }
 
-            /* MUTEX UNLOCK: Libera mutex após operações críticas */
             pthread_mutex_unlock(&state->queue.mutex);
         }
     }
-
     return NULL;
 }
 
 /**
- * Recarrega a fila com um novo conjunto de imagens para processamento
+ * @brief Recarrega a fila com um novo conjunto de imagens para processamento
  *
  * SINCRONIZAÇÃO:
- * - Usa mutex para proteção durante a atualização da fila
+ * - Usa mutex para proteger a atualização da fila
  * - Sinaliza threads trabalhadoras que estão esperando por trabalho
  *
- * @param state Estado compartilhado a ser atualizado
- * @param input_dir Diretório com as imagens de entrada
- * @param output_dir Diretório onde serão salvas as imagens processadas
- * @param new_transform Função de transformação a ser aplicada nas imagens
+ * @param state Estado compartilhado
+ * @param input_dir Diretório com de entrada
+ * @param output_dir Diretório de saída
+ * @param new_transform Função de transformação das imagens
  * @return 1 se sucesso, 0 se falha
  */
 int reload_queue(SharedState *state, const char *input_dir, const char *output_dir,
                  PixelTransformFunction new_transform)
 {
-    /*
-     * MUTEX LOCK: Protege modificação da fila compartilhada
-     * Garante que nenhuma thread vai tentar acessar a fila durante a recarga
-     */
     pthread_mutex_lock(&state->queue.mutex);
 
-    /* Libera recursos da fila anterior se existir */
     free(state->queue.paths);
 
-    /* Escaneia diretório para encontrar imagens e preencher nova fila */
+    // Busca imagens no diretório de entrada
     int count;
     state->queue.paths = scan_directory(input_dir, output_dir, &count);
     if (!state->queue.paths)
     {
-        /* Em caso de falha, libera mutex e retorna erro */
         pthread_mutex_unlock(&state->queue.mutex);
         return 0;
     }
 
-    /*
-     * Reinicializa estado da fila de forma segura (dentro da seção crítica)
-     * - size: número total de imagens a processar
-     * - current: índice da próxima imagem (0 = início da fila)
-     * - processed: contador de imagens processadas (0 = nenhuma processada)
-     * - transform: nova função de transformação
-     */
+    // Reinicializa estado
     state->queue.size = count;
     state->queue.current = 0;
     state->queue.processed = 0;
     state->transform = new_transform;
 
     /*
-     * BROADCAST: Notifica TODAS as threads trabalhadoras
+     * SUSPENSÃO CONTROLADA: Notifica TODAS as threads trabalhadoras
      *
-     * Diferente de signal (que acorda apenas uma thread), broadcast acorda todas.
-     * Importante pois múltiplas threads podem estar esperando por trabalho.
-     * Após acordar, cada thread irá competir pelo mutex para obter imagens da fila.
+     * Acorda todas threads esperando por trabalho
      */
     pthread_cond_broadcast(&state->queue.queue_cond);
 
-    /* MUTEX UNLOCK: Libera mutex para outras threads */
     pthread_mutex_unlock(&state->queue.mutex);
 
     return 1;
 }
 
 /**
- * Função principal de processamento paralelo de imagens
+ * @brief Processamento paralelo de imagens
  *
  * SINCRONIZAÇÃO:
  * - Inicializa e gerencia o pool de threads trabalhadoras
- * - Coordena ciclos de processamento para diferentes filtros
- * - Implementa mecanismo de sinalização para término do processamento
+ * - Coordena os filtros
  * - Mantém estatísticas de tempo e quantidade de processamento
  *
  * @param input_dir Diretório com as imagens originais
@@ -342,14 +317,6 @@ int reload_queue(SharedState *state, const char *input_dir, const char *output_d
 int process_directory_parallel(const char *input_dir, int num_threads)
 {
     SharedState state = {0};
-
-    /*
-     * INICIALIZAÇÃO DE SINCRONIZAÇÃO: Prepara objetos de sincronização
-     *
-     * 1. mutex: proteger acesso compartilhado à fila e contadores
-     * 2. queue_cond: sinalizar quando a fila tem/não tem mais trabalho
-     * 3. done_cond: sinalizar quando todo o processamento de um lote terminou
-     */
     pthread_mutex_init(&state.queue.mutex, NULL);
     pthread_cond_init(&state.queue.queue_cond, NULL);
     pthread_cond_init(&state.queue.done_cond, NULL);
@@ -357,8 +324,9 @@ int process_directory_parallel(const char *input_dir, int num_threads)
     state.queue.total_time = 0.0;
 
     /*
-     * CRIAÇÃO DO POOL DE THREADS: Inicia threads trabalhadoras
-     * Cada thread executará a função worker_thread com o mesmo estado compartilhado
+     * POOL DE THREADS:
+     *
+     * Cada thread executa `worker_thread` com o mesmo estado compartilhado
      */
     pthread_t *threads = malloc(num_threads * sizeof(pthread_t));
     for (int i = 0; i < num_threads; i++)
@@ -375,7 +343,7 @@ int process_directory_parallel(const char *input_dir, int num_threads)
     while (1)
     {
         /*
-         * SINALIZAÇÃO DE TÉRMINO: Notifica todas as threads para terminar
+         * SUSPENSÃO CONTROLADA: Notifica todas as threads para terminar
          *
          * Quando usuário escolhe 'sair':
          * 1. Bloqueia mutex para acessar estado compartilhado
@@ -418,13 +386,10 @@ int process_directory_parallel(const char *input_dir, int num_threads)
         }
 
         /*
-         * SUSPENSÃO DA THREAD PRINCIPAL: Aguarda término de processamento
+         * SUSPENSÃO CONTROLADA: Thread principal aguarda término de processamento
          *
-         * 1. Bloqueia mutex para verificar estado da fila
-         * 2. Usa while (não if!) para proteção contra wakeups espúrios
-         * 3. Dorme na variável de condição done_cond até receber sinal
-         *    - A última thread a processar uma imagem enviará esse sinal
-         *    - Cada filtro só termina quando todas as imagens são processadas
+         * - A última thread a processar uma imagem enviará esse sinal
+         * - Cada filtro só termina quando todas as imagens são processadas
          */
         pthread_mutex_lock(&state.queue.mutex);
         while (state.queue.processed < state.queue.size && !state.queue.should_exit)
@@ -449,8 +414,6 @@ int process_directory_parallel(const char *input_dir, int num_threads)
         edit_type = get_next_edit_type();
     }
 
-    // JOIN DE THREADS: Espera todas as threads trabalhadoras terminarem antes de finalziar o programa
-
     for (int i = 0; i < num_threads; i++)
     {
         pthread_join(threads[i], NULL);
@@ -463,14 +426,7 @@ int process_directory_parallel(const char *input_dir, int num_threads)
            total_processed / (state.queue.total_time > 0 ? state.queue.total_time : 1));
     printf("- Utilizando %d threads\n", num_threads);
 
-    /*
-     * LIMPEZA DE RECURSOS DE SINCRONIZAÇÃO:
-     *
-     * É importante destruir todos os objetos de sincronização criados:
-     * - Libera recursos do sistema operacional
-     * - Evita vazamentos de memória
-     * - Deve ser feito apenas após todas as threads terem terminado
-     */
+    // Destruindo objetos de sincronização
     pthread_mutex_destroy(&state.queue.mutex);
     pthread_cond_destroy(&state.queue.queue_cond);
     pthread_cond_destroy(&state.queue.done_cond);
