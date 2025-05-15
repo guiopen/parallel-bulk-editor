@@ -1,2 +1,6 @@
+/.vscode
+
 editor
 /test_images*
+/bin
+/obj
