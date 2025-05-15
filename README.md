@@ -5,6 +5,7 @@ Processador paralelo de imagens que aplica filtros em múltiplas imagens simulta
 ## Padrões de Programação Paralela
 
 ### 1. Thread Pool
+
 - As threads são criadas no início com a quantidade definida pelo usuário
 - São reutilizadas para processar diferentes filtros de imagem
 - Cada thread obtém uma imagem da fila compartilhada, processa, e repete
@@ -13,6 +14,7 @@ Processador paralelo de imagens que aplica filtros em múltiplas imagens simulta
 - Economiza recursos evitando criação/destruição constante de threads
 
 ### 2. Suspensão Controlada
+
 - A thread principal gerencia o ciclo de vida do processamento
 - As threads trabalhadoras são suspensas quando a fila esvazia
 - A thread principal é suspensa enquanto as trabalhadoras processam
@@ -22,6 +24,7 @@ Processador paralelo de imagens que aplica filtros em múltiplas imagens simulta
 ## Estruturas de Sincronização
 
 ### 1. Mutex (pthread_mutex_t)
+
 - Protege o acesso à fila compartilhada de imagens
 - Garante exclusão mútua no acesso aos contadores:
   - current: próxima imagem a ser processada
@@ -30,6 +33,7 @@ Processador paralelo de imagens que aplica filtros em múltiplas imagens simulta
 - Previne condições de corrida no acesso à fila e contadores
 
 ### 2. Variáveis de Condição (pthread_cond_t)
+
 - Implementa a suspensão e reativação de todas as threads usando duas variáveis distintas:
   - queue_cond: para controle da fila de trabalho
   - done_cond: para sinalização de conclusão do processamento
@@ -45,7 +49,7 @@ Processador paralelo de imagens que aplica filtros em múltiplas imagens simulta
 ## Compilação
 
 ```bash
-gcc -o editor main.c img_editing.c -pthread -lm
+gcc -o editor main.c img_editing.c ui.c file_utils.c -pthread -lm
 ```
 
 ## Uso
@@ -54,7 +58,8 @@ gcc -o editor main.c img_editing.c -pthread -lm
 ./editor
 ```
 
-### Fluxo de Execução
+### Etapas de Operação do Programa
+
 1. Programa solicita informações iniciais:
    - Caminho do diretório com as imagens
    - Número de threads desejado para processamento
@@ -72,6 +77,7 @@ gcc -o editor main.c img_editing.c -pthread -lm
    - Mostra tempo total efetivo de processamento
 
 ### Medição de Tempo
+
 - Usa CLOCK_MONOTONIC para precisão de nanosegundos
 - Mede apenas o tempo efetivo de processamento
 - Não inclui tempo gasto pelo usuário escolhendo opções
@@ -80,6 +86,7 @@ gcc -o editor main.c img_editing.c -pthread -lm
   - Tempo total acumulado ao final
 
 ### Filtros e Opções Disponíveis
+
 - grayscale: converte para escala de cinza usando pesos perceptuais (R:21%, G:72%, B:7%)
 - red: mantém apenas o canal vermelho
 - green: mantém apenas o canal verde
@@ -88,6 +95,7 @@ gcc -o editor main.c img_editing.c -pthread -lm
 - sair: encerra o programa
 
 ### Formato de Saída
+
 O programa cria/usa um diretório para cada tipo de filtro:
 pasta_entrada_filtro (ex: imagens_red)
 
@@ -97,6 +105,7 @@ Se o diretório já existe:
 - Mantém outras imagens existentes
 
 ### Formatos de Imagem Suportados
+
 - JPG/JPEG
 - PNG
 
@@ -104,10 +113,10 @@ Se o diretório já existe:
 
 ```
 .
-├── main.c              # Implementação do processamento paralelo e interface
+├── main.c              # Implementação do processamento paralelo
 ├── img_editing.h       # Definições das estruturas e funções
 ├── img_editing.c       # Implementação dos filtros de imagem
-└── libs/              
+└── libs/
     ├── stb_image.h        # Biblioteca para leitura de imagens
     └── stb_image_write.h  # Biblioteca para escrita de imagens
 ```
@@ -115,13 +124,15 @@ Se o diretório já existe:
 ## Detalhes de Implementação
 
 ### Estruturas de Dados
-- `ImageQueue`: Fila thread-safe de imagens para processamento
+
+- `Queue`: Fila thread-safe de imagens para processamento
   - Mantém arrays com paths de entrada/saída
   - Contadores para controle de progresso
   - Flag de controle de término
   - Mutex e variável de condição para sincronização
 
-### Fluxo de Execução
+### Arquitetura de Execução Multi-Thread
+
 1. Thread Principal:
    - Obtém configurações do usuário:
      - Diretório de entrada

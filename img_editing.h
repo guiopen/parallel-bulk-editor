@@ -15,7 +15,7 @@ typedef struct
     uint8_t b;
 } Pixel;
 
-/* Tipo de função que realiza transformação em pixels */
+// Tipo de função que realiza transformação em pixels
 typedef Pixel (*PixelTransformFunction)(Pixel);
 
 /*
@@ -30,7 +30,7 @@ typedef struct
 /*
  * Fila de imagens thread-safe com sincronização de processamento entre múltiplas threads
  *
- * Utiliza os seguintes mecanismos:
+ * Utiliza as seguintes estratégias:
  * 1. mutex - Garante exclusão mútua ao acessar a fila
  * 2. queue_cond - Variável de condição para sinalizar quando há/não há trabalho
  * 3. done_cond - Variável de condição para indicar conclusão do processamento
@@ -46,7 +46,9 @@ typedef struct
     double total_time;  // Tempo total acumulado em segundos
 
     pthread_mutex_t mutex;
+    // Define a espera das Threads trabalhadoras por imagens
     pthread_cond_t queue_cond;
+    // Define a espera da Thread principal pela conclusão do processamento
     pthread_cond_t done_cond;
 } Queue;
 
@@ -57,14 +59,13 @@ typedef struct
 {
     Queue queue;
     PixelTransformFunction transform;
-    int total_processed; // Novo contador global
+    int total_processed;
 } SharedState;
 
-/* Funções de transformação de imagens */
+// Função de transformação de imagem
 int transform_image(const char *input_path, const char *output_path, PixelTransformFunction transform);
 
 // Filtros disponíveis
-
 Pixel grayscale(Pixel pixel);
 Pixel filter_red(Pixel pixel);
 Pixel filter_green(Pixel pixel);
