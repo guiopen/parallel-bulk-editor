@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <time.h>
+#include <sys/time.h>
 #include "ui.h"
 #include "img_editing.h"
 #include "file_utils.h"
@@ -213,8 +213,8 @@ int process_directory_parallel(const char *input_dir, int num_threads)
         mkdir(output_dir, 0777);
 
         // Registra tempo de início desta edição
-        struct timespec start_time;
-        clock_gettime(CLOCK_MONOTONIC, &start_time);
+        struct timeval start_time;
+        gettimeofday(&start_time, NULL);
 
         if (!reload_queue(&state, input_dir, output_dir, transform))
         {
@@ -235,10 +235,11 @@ int process_directory_parallel(const char *input_dir, int num_threads)
         }
 
         // Calcula tempo gasto nesta edição
-        struct timespec end_time;
-        clock_gettime(CLOCK_MONOTONIC, &end_time);
+        struct timeval end_time;
+        gettimeofday(&end_time, NULL);
+
         double elapsed = (end_time.tv_sec - start_time.tv_sec) +
-                         (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
+                         (end_time.tv_usec - start_time.tv_usec) / 1e6;
 
         state.queue.total_time += elapsed; // Total acumulado
         total_processed += state.queue.processed;
