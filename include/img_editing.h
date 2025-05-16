@@ -42,7 +42,6 @@ typedef struct
     int current;        // Índice da próxima imagem a ser processada
     int processed;      // Contador de imagens já processadas
     int should_exit;    // Flag para indicar que as threads devem terminar
-    int active_threads; // Número de threads ativas
     double total_time;  // Tempo total acumulado em segundos
 
     pthread_mutex_t mutex;
