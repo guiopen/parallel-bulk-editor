@@ -272,8 +272,7 @@ int main()
     char *input_dir = get_input_directory();
     int num_threads = get_thread_count();
 
-    int total_processed = process_directory_parallel(input_dir, num_threads);
-    printf("\nTotal de imagens processadas: %d\n", total_processed);
+    process_directory_parallel(input_dir, num_threads);
 
     free(input_dir);
     return 0;

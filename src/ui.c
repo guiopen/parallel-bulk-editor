@@ -7,7 +7,7 @@
 char *get_input_directory()
 {
     char *dir = malloc(512);
-    printf("Digite o caminho do diretório com as imagens: ");
+    printf("Caminho do diretório com as imagens: ");
     if (fgets(dir, 512, stdin) != NULL)
     {
         dir[strcspn(dir, "\n")] = 0;
@@ -31,7 +31,7 @@ int get_thread_count()
 {
     int num_threads;
     char buffer[32];
-    printf("Digite o número de threads desejado: ");
+    printf("\nNúmero de threads: ");
 
     while (fgets(buffer, sizeof(buffer), stdin))
     {
@@ -47,7 +47,7 @@ int get_thread_count()
 char *get_edit_type()
 {
     char *edit_type = malloc(20);
-    printf("Digite o tipo de filtro ou 'sair'\n");
+    printf("\nEscolha um tipo de filtro ou 'sair'\n");
     printf("Tipos disponíveis: grayscale, red, green, blue, invert\n> ");
     if (fgets(edit_type, 20, stdin) != NULL)
     {
@@ -57,15 +57,16 @@ char *get_edit_type()
 }
 
 void display_processing_result(const char *edit_type, int count, double elapsed){
-    printf("Processadas %d imagens com filtro %s em %.2f segundos\n",
+    printf("Processadas %d imagens com filtro '%s' em %.2f segundos\n",
                count, edit_type, elapsed);
 }
 
 void display_final_statistics(int total_processed, double total_time, int num_threads){
-    printf("\nEstatísticas finais:\n");
-    printf("- Imagens processadas: %d\n", total_processed);
-    printf("- Tempo total de processamento: %.2f segundos\n", total_time);
-    printf("- Velocidade média: %.2f imagens/segundo\n",
-           total_processed / (total_time > 0 ? total_time : 1));
-    printf("- Utilizando %d threads\n", num_threads);
+    printf("\n======= Estatísticas finais =======\n\n");
+    printf("%-25s %d\n", "Imagens processadas:", total_processed);
+    printf("%-25s %.2f %s\n", "Tempo total:", total_time, "s");
+    printf("%-25s %.2f %s\n", "Velocidade media:", 
+        total_processed / (total_time > 0 ? total_time : 1), "imagens/s");
+
+    printf("\n> Utilizando %d threads\n", num_threads);
 }

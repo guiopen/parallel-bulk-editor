@@ -43,8 +43,8 @@ As threads são criadas de acordo com a quantidade definida pelo usuário:
 ### 2. Suspensão Controlada
 
 Está presente nos casos:
-- Threads <u>trabalhadoras</u> são suspensas quando a fila esvazia, acordando somente quando um novo filtro é selecionado
-- Thread <u>principal</u> é suspensa enquanto as trabalhadoras processam
+- Threads <ins>trabalhadoras</ins> são suspensas quando a fila esvazia, acordando somente quando um novo filtro é selecionado
+- Thread <ins>principal</ins> é suspensa enquanto as trabalhadoras processam
 
 
 ## Estruturas de Sincronização
@@ -58,5 +58,5 @@ Protege o acesso à fila compartilhada (`state.queue`) de imagens e aos contador
 
 ### 2. Variáveis de Condição (`pthread_cond_t`)
 
-1. `done_cond` para a espera da thread <u>principal</u> durante o processamento
-2. `queue_cond` para a espera das threads <u>trabalhadoras</u> quando a fila esvazia
+1. `done_cond` para a espera da thread <ins>principal</ins> durante o processamento
+2. `queue_cond` para a espera das threads <ins>trabalhadoras</ins> quando a fila esvazia
